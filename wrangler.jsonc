@@ -10,7 +10,17 @@
 	"observability": {
 		"enabled": true
 	},
-	"upload_source_maps": true
+	"upload_source_maps": true,
+	"browser": {
+		"binding": "BROWSER"
+	},
+	"compatibility_flags": [ "nodejs_compat" ],
+	"kv_namespaces": [
+		{
+			"binding": "APPLE_CACHE",
+			"id": "08bd5efabec0456f96f03ddde1c677fe"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
