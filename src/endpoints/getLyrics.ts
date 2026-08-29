@@ -2,6 +2,7 @@ import { Context } from "hono";
 import { BlankInput } from "hono/types";
 import { getAppleMusicToken } from "../appleMusicToken";
 import { SpotifyApi } from "@spotify/web-api-ts-sdk";
+import { parseLyrics } from "../lyricsParser";
 
 const sdk = SpotifyApi.withClientCredentials(process.env.SPOTIFY_CLIENT!, process.env.SPOTIFY_SECRET!)
 
@@ -64,9 +65,10 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             }, 500);
         }
 
-        const json = await response.json();
+        const json: any = await response.json();
+        const lyrics = parseLyrics(json.data[0].attributes.ttmlLocalizations);
 
-        return c.json(json);
+        return c.json(lyrics);
     } catch (error) {
         console.error('Failed to get Apple Music token:', error);
 
