@@ -14,6 +14,12 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             error: 'No ID provided'
         }, 400);
 
+        const cachedLyrics = await c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`);
+
+        if (cachedLyrics) {
+            return c.json(JSON.parse(cachedLyrics));
+        }
+
         const track = await sdk.tracks.get(spotifyId);
         if (!track.external_ids.isrc) return c.json({
             error: 'Could not get ISRC'
@@ -88,6 +94,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
                 continue;
             }
 
+            await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(lyrics));
             return c.json(lyrics);
         }
 

@@ -165,3 +165,8 @@ dist
 .env*
 !.env.example
 .wrangler/
+line-lyrics.xml
+non-english-lyrics.xml
+static-lyrics.xml
+syllable-lyrics.xml
+lyrics.json

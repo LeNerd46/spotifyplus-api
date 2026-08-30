@@ -8,13 +8,17 @@ const parser = new XMLParser({
     trimValues: false
 });
 
+const whitespaceRegex = /\s/;
+const leadingWhitespaceRegex = /^\s/;
+const trailingWhitespaceRegex = /\s$/;
+
 type XmlNode = {
     [key: string]: any;
 }
 
 type AuxiliaryText = {
     text: string;
-    spans?: SyllableMetadata[];
+    spans?: string[];
 }
 
 type ParsedMetadata = {
@@ -29,12 +33,10 @@ export const parseLyrics = (ttml: string): Lyrics => {
     const tt = findFirstElement(xml, 'tt');
     if (!tt) throw new Error('Invalid ttml, missing <tt> element');
 
-    const ttAttributes = getAttributes(tt);
-    const timing = ttAttributes['itunes:timing'] ?? 'None';
-
+    const timing = getAttributes(tt)['itunes:timing'] ?? 'None';
     const metadata = parseMetadata(tt);
-    const body = findFirstElement(getChildren(tt), 'body');
 
+    const body = findFirstElement(getChildren(tt), 'body');
     if (!body) throw new Error('Invalid ttml: missing <body> element');
 
     switch (timing.toLowerCase()) {
@@ -54,10 +56,11 @@ export const parseLyrics = (ttml: string): Lyrics => {
 
 const parseStaticLyrics = (body: XmlNode, metadata: ParsedMetadata): StaticSyncedLyrics => {
     const paragraphs = findElements(getChildren(body), 'p');
+    const lines: TextMetadata[] = new Array(paragraphs.length);
 
-    const lines: TextMetadata[] = paragraphs.map(paragraph => {
-        const attributes = getAttributes(paragraph);
-        const key = attributes['itunes:key'];
+    for (let i = 0; i < paragraphs.length; i++) {
+        const paragraph = paragraphs[i]!;
+        const key = getAttributes(paragraph)['itunes:key'];
 
         const line: TextMetadata = {
             Text: getNodeText(paragraph).trim()
@@ -71,8 +74,8 @@ const parseStaticLyrics = (body: XmlNode, metadata: ParsedMetadata): StaticSynce
             if (romanization?.text) line.RomanizedText = romanization.text;
         }
 
-        return line;
-    });
+        lines[i] = line;
+    }
 
     return {
         Type: 'Static',
@@ -94,10 +97,15 @@ const parseLineLyrics = (body: XmlNode, metadata: ParsedMetadata): LineSyncedLyr
         };
     }
 
-    const primaryAgent = getPrimaryAgent(paragraphs);
+    const content: LineVocal[] = new Array(paragraphs.length);
 
-    const content: LineVocal[] = paragraphs.map(paragraph => {
+    let startTime = Infinity;
+    let endTime = -Infinity;
+
+    for (let i = 0; i < paragraphs.length; i++) {
+        const paragraph = paragraphs[i]!;
         const attributes = getAttributes(paragraph);
+
         const key = attributes['itunes:key'];
         const agent = attributes['ttm:agent'];
 
@@ -105,8 +113,8 @@ const parseLineLyrics = (body: XmlNode, metadata: ParsedMetadata): LineSyncedLyr
             Type: 'Vocal',
             StartTime: parseTime(attributes.begin),
             EndTime: parseTime(attributes.end),
-            Text: getLeadLineText(paragraph).trim(),
-            OppositeAligned: isOppositeAligned(agent, primaryAgent)
+            Text: getLeadLineText(paragraph),
+            OppositeAligned: isOppositeAligned(agent)
         };
 
         if (key) {
@@ -117,13 +125,16 @@ const parseLineLyrics = (body: XmlNode, metadata: ParsedMetadata): LineSyncedLyr
             if (romanization?.text) vocal.RomanizedText = romanization.text;
         }
 
-        return vocal;
-    });
+        if (vocal.StartTime < startTime) startTime = vocal.StartTime;
+        if (vocal.EndTime > endTime) endTime = vocal.EndTime;
+
+        content[i] = vocal;
+    }
 
     return {
         Type: 'Line',
-        StartTime: Math.min(...content.map(x => x.StartTime)),
-        EndTime: Math.max(...content.map(x => x.EndTime)),
+        StartTime: startTime,
+        EndTime: endTime,
         SongWriters: metadata.songWriters,
         Content: content
     };
@@ -142,8 +153,10 @@ const parseSyllableLyrics = (body: XmlNode, metadata: ParsedMetadata): SyllableS
         };
     }
 
-    const primaryAgent = getPrimaryAgent(paragraphs);
     const content: SyllableVocalSet[] = [];
+
+    let startTime = Infinity;
+    let endTime = -Infinity;
 
     for (const paragraph of paragraphs) {
         const attributes = getAttributes(paragraph);
@@ -152,27 +165,24 @@ const parseSyllableLyrics = (body: XmlNode, metadata: ParsedMetadata): SyllableS
 
         const children = getChildren(paragraph);
 
-        const leadNodes = children.filter(node => {
-            if (!isElement(node, 'span')) return true;
-
-            const spanAttributes = getAttributes(node);
-            const role = spanAttributes['ttm:role'];
-
-            return role !== 'x-bg' && role !== 'x-translation' && role !== 'x-roman';
-        });
-
-        const leadSyllables = parseTimedSyllables(leadNodes);
+        const leadSyllables = parseTimedSyllables(children);
         if (leadSyllables.length === 0) continue;
 
         applyAuxiliarySyllableMetadata(leadSyllables, key ? metadata.translations.get(key) : undefined, key ? metadata.romanizations.get(key) : undefined);
 
+        const leadStartTime = parseTime(attributes.begin) || leadSyllables[0]!.StartTime;
+        const leadEndTime = parseTime(attributes.end) || leadSyllables[leadSyllables.length - 1]!.EndTime;
+
         const lead: SyllableVocal = {
-            StartTime: parseTime(attributes.begin) || leadSyllables[0]!.StartTime,
-            EndTime: parseTime(attributes.end) || leadSyllables[leadSyllables.length - 1]!.EndTime,
+            StartTime: leadStartTime,
+            EndTime: leadEndTime,
             Syllables: leadSyllables
         };
 
         const background: SyllableVocal[] = [];
+
+        if (leadStartTime < startTime) startTime = leadStartTime;
+        if (leadEndTime > endTime) endTime = leadEndTime;
 
         for (const child of children) {
             if (!isElement(child, 'span')) continue;
@@ -183,16 +193,21 @@ const parseSyllableLyrics = (body: XmlNode, metadata: ParsedMetadata): SyllableS
             const backgroundSyllables = parseTimedSyllables(getChildren(child));
             if (backgroundSyllables.length === 0) continue;
 
+            const backgroundStartTime = parseTime(childAttributes.begin) || backgroundSyllables[0]!.StartTime;
+            const backgroundEndTime = parseTime(childAttributes.end) || backgroundSyllables[backgroundSyllables.length - 1]!.EndTime;
+
             background.push({
-                StartTime: parseTime(childAttributes.begin) || backgroundSyllables[0]!.StartTime,
-                EndTime: parseTime(childAttributes.end) || backgroundSyllables[backgroundSyllables.length - 1]!.EndTime,
+                StartTime: backgroundStartTime,
+                EndTime: backgroundEndTime,
                 Syllables: backgroundSyllables
             });
+
+            if (backgroundEndTime > endTime) endTime = backgroundEndTime;
         }
 
         const vocalSet: SyllableVocalSet = {
             Type: 'Vocal',
-            OppositeAligned: isOppositeAligned(agent, primaryAgent),
+            OppositeAligned: isOppositeAligned(agent),
             Lead: lead
         };
 
@@ -223,8 +238,8 @@ const parseSyllableLyrics = (body: XmlNode, metadata: ParsedMetadata): SyllableS
 
     return {
         Type: 'Syllable',
-        StartTime: Math.min(...content.map(x => x.Lead.StartTime)),
-        EndTime: Math.max(...content.flatMap(x => [x.Lead.EndTime, ...(x.Background?.map(background => background.EndTime) ?? [])])),
+        StartTime: startTime,
+        EndTime: endTime,
         SongWriters: metadata.songWriters,
         Content: content
     };
@@ -233,8 +248,18 @@ const parseSyllableLyrics = (body: XmlNode, metadata: ParsedMetadata): SyllableS
 const parseTimedSyllables = (nodes: XmlNode[]): SyllableMetadata[] => {
     const syllables: SyllableMetadata[] = [];
 
-    for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i]!;
+    let previousSyllable: SyllableMetadata | undefined;
+    let previousHasTrailingWhitespace = false;
+    let separatorHasWhitespace = false;
+
+    for (const node of nodes) {
+        if (node['#text'] !== undefined) {
+            if (previousSyllable && !separatorHasWhitespace && whitespaceRegex.test(String(node['#text']))) {
+                separatorHasWhitespace = true;
+            }
+
+            continue;
+        }
 
         if (!isElement(node, 'span')) continue;
 
@@ -244,77 +269,47 @@ const parseTimedSyllables = (nodes: XmlNode[]): SyllableMetadata[] => {
         if (role === 'x-bg' || role === 'x-translation' || role === 'x-roman') continue;
         if (!attributes.begin || !attributes.end) continue;
 
-        let text = getNodeText(node);
+        const rawText = getNodeText(node);
+        const hasLeadingWhitespace = leadingWhitespaceRegex.test(rawText);
 
-        const hasLeadingWhitespace = /^\s/.test(text);
-        const hasTrailingWhitespace = /\s$/.test(text);
-
-        text = text.trim();
-        if (!text) continue;
-
-        const nextSpanIndex = findNextTimedSpanIndex(nodes, i + 1);
-        let isPartOfWord = false;
-
-        if (nextSpanIndex !== -1 && !hasTrailingWhitespace) {
-            const separator = getTextBetween(nodes, i + 1, nextSpanIndex);
-            const nextText = getNodeText(nodes[nextSpanIndex]!);
-            const nextHasLeadingWhitespace = /^\s/.test(nextText);
-
-            isPartOfWord = !/\s/.test(separator) && !nextHasLeadingWhitespace;
+        // A timed span counts as the "next span" even if its text is empty.
+        // This preserves the behavior of the previous implementation.
+        if (previousSyllable) {
+            previousSyllable.IsPartOfWord = !previousHasTrailingWhitespace && !separatorHasWhitespace && !hasLeadingWhitespace;
         }
 
-        syllables.push({
+        previousSyllable = undefined;
+        separatorHasWhitespace = false;
+
+        const text = rawText.trim();
+        if (!text) continue;
+
+        const syllable: SyllableMetadata = {
             Text: text,
             StartTime: parseTime(attributes.begin),
             EndTime: parseTime(attributes.end),
-            IsPartOfWord: isPartOfWord
-        });
+            IsPartOfWord: false
+        };
+
+        syllables.push(syllable);
+
+        previousSyllable = syllable;
+        previousHasTrailingWhitespace = trailingWhitespaceRegex.test(rawText);
     }
 
     return syllables;
 }
 
-const findNextTimedSpanIndex = (nodes: XmlNode[], start: number): number => {
-    for (let i = start; i < nodes.length; i++) {
-        const node = nodes[i]!;
-
-        if (!isElement(node, 'span')) continue;
-
-        const attributes = getAttributes(node);
-        const role = attributes['ttm:role'];
-
-        if (role === 'x-bg' || role === 'x-translation' || role === 'x-roman') continue;
-
-        if (attributes.begin && attributes.end) return i;
-    }
-
-    return -1;
-}
-
-const getTextBetween = (nodes: XmlNode[], start: number, end: number): string => {
-    let text = '';
-
-    for (let i = start; i < end; i++) {
-        const node = nodes[i]!;
-
-        if (node['#text'] !== undefined) {
-            text += String(node['#text']);
-        }
-    }
-
-    return text;
-}
-
 const applyAuxiliarySyllableMetadata = (syllables: SyllableMetadata[], translation?: AuxiliaryText, romanization?: AuxiliaryText) => {
     if (translation?.spans && translation.spans.length === syllables.length) {
         for (let i = 0; i < syllables.length; i++) {
-            syllables[i]!.TranslatedText = translation.spans[i]?.Text;
+            syllables[i]!.TranslatedText = translation.spans[i];
         }
     }
 
     if (romanization?.spans && romanization.spans.length === syllables.length) {
         for (let i = 0; i < syllables.length; i++) {
-            syllables[i]!.RomanizedText = romanization.spans[i]?.Text;
+            syllables[i]!.RomanizedText = romanization.spans[i];
         }
     }
 }
@@ -327,20 +322,25 @@ const parseMetadata = (tt: XmlNode): ParsedMetadata => {
     };
 
     const iTunesMetadata = findFirstElement(getChildren(tt), 'iTunesMetadata');
+    if (!iTunesMetadata) return metadata;
 
-    if (!iTunesMetadata) {
-        return metadata;
-    }
+    const metadataChildren = getChildren(iTunesMetadata);
 
-    const songwritersElement = findFirstElement(getChildren(iTunesMetadata), 'songwriters');
+    const songwritersElement = findFirstElement(metadataChildren, 'songwriters');
 
     if (songwritersElement) {
         const songwriterElements = findElements(getChildren(songwritersElement), 'songwriter');
 
-        metadata.songWriters = songwriterElements.map(songwriter => getNodeText(songwriter).trim()).filter(Boolean);
+        for (const songwriter of songwriterElements) {
+            const text = getNodeText(songwriter).trim();
+
+            if (text) {
+                metadata.songWriters.push(text);
+            }
+        }
     }
 
-    const translationsElement = findFirstElement(getChildren(iTunesMetadata), 'translations');
+    const translationsElement = findFirstElement(metadataChildren, 'translations');
 
     if (translationsElement) {
         const translations = findElements(getChildren(translationsElement), 'translation');
@@ -349,13 +349,7 @@ const parseMetadata = (tt: XmlNode): ParsedMetadata => {
             const textElements = findElements(getChildren(translation), 'text');
 
             for (const textElement of textElements) {
-                const attributes = getAttributes(textElement);
-                const key = attributes.for;
-
-                console.log('Translation attributes:', attributes);
-                console.log('Translation key:', key);
-                console.log('Translation text:', getNodeText(textElement).trim());
-
+                const key = getAttributes(textElement).for;
                 if (!key) continue;
 
                 metadata.translations.set(key, {
@@ -366,7 +360,7 @@ const parseMetadata = (tt: XmlNode): ParsedMetadata => {
         }
     }
 
-    const transliterationsElement = findFirstElement(getChildren(iTunesMetadata), 'transliterations');
+    const transliterationsElement = findFirstElement(metadataChildren, 'transliterations');
 
     if (transliterationsElement) {
         const transliterations = findElements(getChildren(transliterationsElement), 'transliteration');
@@ -375,9 +369,7 @@ const parseMetadata = (tt: XmlNode): ParsedMetadata => {
             const textElements = findElements(getChildren(transliteration), 'text');
 
             for (const textElement of textElements) {
-                const attributes = getAttributes(textElement);
-                const key = attributes.for;
-
+                const key = getAttributes(textElement).for;
                 if (!key) continue;
 
                 metadata.romanizations.set(key, {
@@ -391,8 +383,25 @@ const parseMetadata = (tt: XmlNode): ParsedMetadata => {
     return metadata;
 }
 
-const parseAuxiliaryTimedSpans = (node: XmlNode): SyllableMetadata[] | undefined => {
-    const spans = parseTimedSyllables(getChildren(node));
+const parseAuxiliaryTimedSpans = (node: XmlNode): string[] | undefined => {
+    const spans: string[] = [];
+
+    for (const child of getChildren(node)) {
+        if (!isElement(child, 'span')) continue;
+
+        const attributes = getAttributes(child);
+        const role = attributes['ttm:role'];
+
+        if (role === 'x-bg' || role === 'x-translation' || role === 'x-roman') continue;
+        if (!attributes.begin || !attributes.end) continue;
+
+        const text = getNodeText(child).trim();
+
+        if (text) {
+            spans.push(text);
+        }
+    }
+
     return spans.length > 0 ? spans : undefined;
 }
 
@@ -407,8 +416,7 @@ const getLeadLineText = (paragraph: XmlNode): string => {
 
         if (!isElement(child, 'span')) continue;
 
-        const attributes = getAttributes(child);
-        const role = attributes['ttm:role'];
+        const role = getAttributes(child)['ttm:role'];
 
         if (role === 'x-bg' || role === 'x-translation' || role === 'x-roman') {
             continue;
@@ -420,60 +428,69 @@ const getLeadLineText = (paragraph: XmlNode): string => {
     return normalizeWhitespace(result);
 }
 
-const getPrimaryAgent = (paragraphs: XmlNode[]): string | undefined => {
-    for (const paragraph of paragraphs) {
-        const agent = getAttributes(paragraph)['ttm:agent'];
-
-        if (agent) {
-            return agent;
-        }
-    }
-
-    return undefined;
-}
-
-const isOppositeAligned = (agent: string | undefined, primaryAgent: string | undefined): boolean => {
-    if (!agent || !primaryAgent) return false;
-    return agent !== primaryAgent;
+const isOppositeAligned = (agent: string | undefined): boolean => {
+    return agent === 'v2';
 }
 
 const parseTime = (value?: string): number => {
     if (!value) return 0;
 
     const trimmed = value.trim();
+    const length = trimmed.length;
 
-    if (trimmed.endsWith('ms')) {
+    if (length >= 2 && trimmed.endsWith('ms')) {
         return Number.parseFloat(trimmed.slice(0, -2)) / 1000;
     }
 
-    if (trimmed.endsWith('s')) {
+    if (length >= 1 && trimmed.charCodeAt(length - 1) === 115) {
         return Number.parseFloat(trimmed.slice(0, -1));
     }
 
-    const parts = trimmed.split(':').map(Number);
+    const firstColon = trimmed.indexOf(':');
 
-    if (parts.some(Number.isNaN)) {
+    if (firstColon === -1) {
+        const result = Number(trimmed);
+
+        if (Number.isNaN(result)) {
+            throw new Error(`Invalid ttml timestamp: ${value}`);
+        }
+
+        return result;
+    }
+
+    const secondColon = trimmed.indexOf(':', firstColon + 1);
+
+    if (secondColon === -1) {
+        const minutes = Number(trimmed.slice(0, firstColon));
+        const seconds = Number(trimmed.slice(firstColon + 1));
+
+        if (Number.isNaN(minutes) || Number.isNaN(seconds)) {
+            throw new Error(`Invalid ttml timestamp: ${value}`);
+        }
+
+        return minutes * 60 + seconds;
+    }
+
+    if (trimmed.indexOf(':', secondColon + 1) !== -1) {
         throw new Error(`Invalid ttml timestamp: ${value}`);
     }
 
-    if (parts.length === 1) {
-        return parts[0]!;
+    const hours = Number(trimmed.slice(0, firstColon));
+    const minutes = Number(trimmed.slice(firstColon + 1, secondColon));
+    const seconds = Number(trimmed.slice(secondColon + 1));
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes) || Number.isNaN(seconds)) {
+        throw new Error(`Invalid ttml timestamp: ${value}`);
     }
 
-    if (parts.length === 2) {
-        return parts[0]! * 60 + parts[1]!;
-    }
-
-    if (parts.length === 3) {
-        return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!;
-    }
-
-    throw new Error(`Invalid ttml timestamp: ${value}`);
+    return hours * 3600 + minutes * 60 + seconds;
 }
 
 const getChildren = (node: XmlNode): XmlNode[] => {
-    for (const [key, value] of Object.entries(node)) {
+    for (const key in node) {
         if (key === ':@' || key === '#text') continue;
+
+        const value = node[key];
 
         if (Array.isArray(value)) {
             return value;
@@ -484,19 +501,11 @@ const getChildren = (node: XmlNode): XmlNode[] => {
 }
 
 const getAttributes = (node: XmlNode): Record<string, string> => {
-    const attributes = node[':@'] ?? {};
-    const result: Record<string, string> = {};
-
-    for (const [key, value] of Object.entries(attributes)) {
-        const normalizedKey = key.startsWith('@_') ? key.substring(2) : key;
-        result[normalizedKey] = String(value);
-    }
-
-    return result;
+    return node[':@'] ?? {};
 }
 
 const isElement = (node: XmlNode, name: string): boolean => {
-    return Object.prototype.hasOwnProperty.call(node, name);
+    return node[name] !== undefined;
 }
 
 const findFirstElement = (nodes: XmlNode[], name: string): XmlNode | undefined => {
@@ -505,10 +514,14 @@ const findFirstElement = (nodes: XmlNode[], name: string): XmlNode | undefined =
             return node;
         }
 
-        const child = findFirstElement(getChildren(node), name);
+        const children = getChildren(node);
 
-        if (child) {
-            return child;
+        if (children.length > 0) {
+            const child = findFirstElement(children, name);
+
+            if (child) {
+                return child;
+            }
         }
     }
 
@@ -518,36 +531,48 @@ const findFirstElement = (nodes: XmlNode[], name: string): XmlNode | undefined =
 const findElements = (nodes: XmlNode[], name: string): XmlNode[] => {
     const results: XmlNode[] = [];
 
-    for (const node of nodes) {
-        if (isElement(node, name)) {
-            results.push(node);
-        }
+    const visit = (children: XmlNode[]) => {
+        for (const node of children) {
+            if (isElement(node, name)) {
+                results.push(node);
+            }
 
-        results.push(...findElements(getChildren(node), name));
-    }
+            const nestedChildren = getChildren(node);
+
+            if (nestedChildren.length > 0) {
+                visit(nestedChildren);
+            }
+        }
+    };
+
+    visit(nodes);
 
     return results;
 }
 
-const getNodeText = (node: XmlNode) => {
+const getNodeText = (node: XmlNode): string => {
+    return getNodesText(getChildren(node));
+}
+
+const getNodesText = (nodes: XmlNode[]): string => {
     let result = '';
 
-    const visit = (nodes: XmlNode[]) => {
-        for (const child of nodes) {
-            if (child['#text'] !== undefined) {
-                result += String(child['#text']);
-                continue;
-            }
-
-            visit(getChildren(child));
+    for (const node of nodes) {
+        if (node['#text'] !== undefined) {
+            result += String(node['#text']);
+            continue;
         }
-    };
 
-    visit(getChildren(node));
+        const children = getChildren(node);
+
+        if (children.length > 0) {
+            result += getNodesText(children);
+        }
+    }
 
     return result;
 }
 
-const normalizeWhitespace = (text: string) => {
+const normalizeWhitespace = (text: string): string => {
     return text.replace(/\s+/g, ' ').trim();
 }
