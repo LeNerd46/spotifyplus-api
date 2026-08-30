@@ -3,6 +3,7 @@ import { BlankInput } from "hono/types";
 import { getAppleMusicToken } from "../appleMusicToken";
 import { SpotifyApi } from "@spotify/web-api-ts-sdk";
 import { parseLyrics } from "../lyricsParser";
+import { Lyrics } from "../types";
 
 const sdk = SpotifyApi.withClientCredentials(process.env.SPOTIFY_CLIENT!, process.env.SPOTIFY_SECRET!)
 
@@ -48,7 +49,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             }, 404);
         }
 
-        let lyricsJson: any = null
+        let fallbackLyrics: Lyrics | null = null;
 
         for (const id of ids) {
             const response = await fetch(`https://amp-api.music.apple.com/v1/catalog/us/songs/${id}/syllable-lyrics?l[lyrics]=en-US&l[script]=en-Latn&extend=ttmlLocalizations`, {
@@ -69,33 +70,34 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             }
 
             if (!response.ok) {
-                const error = await response.json();
-
-                return c.json({
-                    message: 'Failed to get lyrics',
-                    error
-                }, 500);
+                console.log(`Failed to get lyrics for ${id}`);
+                continue;
             }
 
             const json: any = await response.json();
-            const ttml = json.data[0].attributes.ttmlLocalizations;
+            const ttml = json.data?.[0]?.attributes?.ttmlLocalizations;
             if (!ttml) {
                 console.log(`No ttml found for ${id}`)
                 continue;
             }
 
-            lyricsJson = json;
-            break;
+            const lyrics = parseLyrics(ttml);
+
+            if (lyrics.Type === 'Static') {
+                fallbackLyrics ??= lyrics;
+                continue;
+            }
+
+            return c.json(lyrics);
         }
 
-        if (!lyricsJson) {
-            return c.json({
-                error: 'Could not find lyrics for any matching Apple Music song'
-            }, 404);
+        if (fallbackLyrics) {
+            return c.json(fallbackLyrics);
         }
 
-        const lyrics = parseLyrics(lyricsJson.data[0].attributes.ttmlLocalizations);
-        return c.json(lyrics);
+        return c.json({
+            error: 'Could not find lyrics for any matching Apple Music song'
+        }, 404);
     } catch (error) {
         console.error('Failed to get Apple Music token:', error);
 
