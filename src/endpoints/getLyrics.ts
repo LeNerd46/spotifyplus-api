@@ -7,8 +7,6 @@ import { parseLyrics } from "../lyricsParser";
 const sdk = SpotifyApi.withClientCredentials(process.env.SPOTIFY_CLIENT!, process.env.SPOTIFY_SECRET!)
 
 export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
-    const id = c.req.param('id');
-
     try {
         const spotifyId = c.req.param('id');
         if (!spotifyId) return c.json({
@@ -38,20 +36,30 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             }, 400);
         }
 
-        const appleJson = await appleResponse.json();
-        //@ts-ignore
-        const { id } = appleJson.data.filter(x => x.type === 'songs')[0];
+        const appleJson = await appleResponse.json() as {
+            data?: { id: string; type: string; }[]
+        };
 
-        const response = await fetch(`https://amp-api.music.apple.com/v1/catalog/us/songs/${id}/syllable-lyrics?l[lyrics]=en-US&l[script]=en-Latn&extend=ttmlLocalizations`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: 'application/json',
-                Origin: 'https://music.apple.com',
-                'Media-User-Token': mediaToken
-            }
-        });
+        const ids = appleJson.data?.filter(x => x.type === 'songs').map(x => x.id) ?? [];
 
-        if (!response.ok) {
+        if (ids.length === 0) {
+            return c.json({
+                error: 'No matching Apple Music songs found'
+            }, 404);
+        }
+
+        let lyricsJson: any = null
+
+        for (const id of ids) {
+            const response = await fetch(`https://amp-api.music.apple.com/v1/catalog/us/songs/${id}/syllable-lyrics?l[lyrics]=en-US&l[script]=en-Latn&extend=ttmlLocalizations`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json',
+                    Origin: 'https://music.apple.com',
+                    'Media-User-Token': mediaToken
+                }
+            });
+
             if (response.status === 401) {
                 await c.env.APPLE_CACHE.delete('apple-developer-token');
 
@@ -60,14 +68,33 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
                 }, 401);
             }
 
-            return c.json({
-                error: 'Failed to get lyrics'
-            }, 500);
+            if (!response.ok) {
+                const error = await response.json();
+
+                return c.json({
+                    message: 'Failed to get lyrics',
+                    error
+                }, 500);
+            }
+
+            const json: any = await response.json();
+            const ttml = json.data[0].attributes.ttmlLocalizations;
+            if (!ttml) {
+                console.log(`No ttml found for ${id}`)
+                continue;
+            }
+
+            lyricsJson = json;
+            break;
         }
 
-        const json: any = await response.json();
-        const lyrics = parseLyrics(json.data[0].attributes.ttmlLocalizations);
+        if (!lyricsJson) {
+            return c.json({
+                error: 'Could not find lyrics for any matching Apple Music song'
+            }, 404);
+        }
 
+        const lyrics = parseLyrics(lyricsJson.data[0].attributes.ttmlLocalizations);
         return c.json(lyrics);
     } catch (error) {
         console.error('Failed to get Apple Music token:', error);
