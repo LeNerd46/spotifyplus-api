@@ -1,0 +1,100 @@
+<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal"
+    xmlns:ttm="http://www.w3.org/ns/ttml#metadata" itunes:timing="Line" xml:lang="en">
+    <head>
+        <metadata>
+            <ttm:agent type="person" xml:id="v1" />
+            <iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal" leadingSilence="0">
+                <translations />
+                <songwriters>
+                    <songwriter>Abel Tesfaye</songwriter>
+                    <songwriter>Axel Hedfors</songwriter>
+                    <songwriter>Carl Nordström</songwriter>
+                    <songwriter>Sebastian Ingrosso</songwriter>
+                    <songwriter>Steve Angello</songwriter>
+                </songwriters>
+            </iTunesMetadata>
+        </metadata>
+    </head>
+    <body dur="3:54.000">
+        <div begin="15.392" end="45.233" itunes:songPart="Verse">
+            <p begin="15.392" end="19.992" itunes:key="L1" ttm:agent="v1">Like a moth to a flame</p>
+            <p begin="20.942" end="30.011" itunes:key="L2" ttm:agent="v1">I'll pull you in, I pulled
+                you back to
+                what you need initially</p>
+            <p begin="31.458" end="36.411" itunes:key="L3" ttm:agent="v1">It's just one call away</p>
+            <p begin="36.929" end="41.222" itunes:key="L4" ttm:agent="v1">And you'll leave him,
+                you're loyal to me</p>
+            <p begin="41.486" end="45.233" itunes:key="L5" ttm:agent="v1">But this time, I let you
+                be</p>
+        </div>
+        <div begin="45.931" end="1:01.217" itunes:songPart="PreChorus">
+            <p begin="45.931" end="49.652" itunes:key="L6" ttm:agent="v1">'Cause he seems like he's
+                good for you</p>
+            <p begin="49.892" end="53.646" itunes:key="L7" ttm:agent="v1">And he makes you feel like
+                you should</p>
+            <p begin="53.918" end="57.668" itunes:key="L8" ttm:agent="v1">And all your friends say
+                he's the one</p>
+            <p begin="57.940" end="1:01.217" itunes:key="L9" ttm:agent="v1">His love for you is true</p>
+        </div>
+        <div begin="1:01.952" end="1:37.650" itunes:songPart="Chorus">
+            <p begin="1:01.952" end="1:09.716" itunes:key="L10" ttm:agent="v1">But does he know you
+                call me when he
+                sleeps?</p>
+            <p begin="1:09.979" end="1:17.603" itunes:key="L11" ttm:agent="v1">But does he know the
+                pictures that you
+                keep?</p>
+            <p begin="1:17.952" end="1:25.698" itunes:key="L12" ttm:agent="v1">But does he know the
+                reasons that you cry?</p>
+            <p begin="1:25.947" end="1:33.751" itunes:key="L13" ttm:agent="v1">Or tell me, does he
+                know where your heart
+                lies?</p>
+            <p begin="1:34.173" end="1:37.650" itunes:key="L14" ttm:agent="v1">Where it truly lies</p>
+        </div>
+        <div begin="1:38.695" end="1:53.703" itunes:songPart="Verse">
+            <p begin="1:38.695" end="1:45.802" itunes:key="L15" ttm:agent="v1">Yeah, you should be
+                with him, I let you go
+                from time</p>
+            <p begin="1:47.669" end="1:53.703" itunes:key="L16" ttm:agent="v1">You should stay with
+                him 'cause he seems
+                like he's good for you</p>
+        </div>
+        <div begin="1:53.932" end="2:05.255" itunes:songPart="PreChorus">
+            <p begin="1:53.932" end="1:57.687" itunes:key="L17" ttm:agent="v1">And he makes you feel
+                like you should</p>
+            <p begin="1:57.929" end="2:01.687" itunes:key="L18" ttm:agent="v1">And all your friends
+                say he's the one</p>
+            <p begin="2:01.905" end="2:05.255" itunes:key="L19" ttm:agent="v1">His love for you is
+                true</p>
+        </div>
+        <div begin="2:05.969" end="2:41.526" itunes:songPart="Chorus">
+            <p begin="2:05.969" end="2:13.724" itunes:key="L20" ttm:agent="v1">But does he know you
+                call me when he
+                sleeps?</p>
+            <p begin="2:13.929" end="2:21.524" itunes:key="L21" ttm:agent="v1">But does he know the
+                pictures that you
+                keep?</p>
+            <p begin="2:21.909" end="2:29.759" itunes:key="L22" ttm:agent="v1">But does he know the
+                reasons that you cry?</p>
+            <p begin="2:29.940" end="2:37.742" itunes:key="L23" ttm:agent="v1">Or tell me, does he
+                know where your heart
+                lies?</p>
+            <p begin="2:38.140" end="2:41.526" itunes:key="L24" ttm:agent="v1">Where it truly lies</p>
+        </div>
+        <div begin="2:43.606" end="3:12.787" itunes:songPart="Outro">
+            <p begin="2:43.606" end="2:45.110" itunes:key="L25" ttm:agent="v1">Right here with me,
+                babe</p>
+            <p begin="2:46.116" end="2:49.011" itunes:key="L26" ttm:agent="v1">Where it truly lies</p>
+            <p begin="2:51.462" end="2:53.161" itunes:key="L27" ttm:agent="v1">In my bed, babe</p>
+            <p begin="2:54.061" end="2:57.227" itunes:key="L28" ttm:agent="v1">Where it truly lies</p>
+            <p begin="2:59.608" end="3:00.878" itunes:key="L29" ttm:agent="v1">In my arms, babe</p>
+            <p begin="3:02.000" end="3:05.400" itunes:key="L30" ttm:agent="v1">Where it truly lies</p>
+            <p begin="3:07.168" end="3:09.685" itunes:key="L31" ttm:agent="v1">Oh-oh</p>
+            <p begin="3:10.014" end="3:12.787" itunes:key="L32" ttm:agent="v1">Where it truly lies</p>
+        </div>
+        <div begin="3:26.154" end="3:45.130" itunes:songPart="Outro">
+            <p begin="3:26.154" end="3:28.937" itunes:key="L33" ttm:agent="v1">Where it truly lies</p>
+            <p begin="3:31.388" end="3:31.778" itunes:key="L34" ttm:agent="v1">Hey</p>
+            <p begin="3:42.070" end="3:45.130" itunes:key="L35" ttm:agent="v1">Where it truly lies</p>
+        </div>
+    </body>
+</tt>

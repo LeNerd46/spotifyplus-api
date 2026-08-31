@@ -24,12 +24,6 @@ export type TextMetadata = {
 
 type VocalMetadata = (TimeMetadata & TextMetadata);
 
-export type Interlude = (
-	TimeMetadata & {
-		Type: 'Interlude'
-	}
-);
-
 export type StaticSyncedLyrics = {
 	Type: 'Static',
 	SongWriters: string[],
@@ -47,7 +41,7 @@ export type LineSyncedLyrics = (
 	TimeMetadata & {
 		Type: 'Line',
 		SongWriters?: string[],
-		Content: (LineVocal | Interlude)[]
+		Content: LineVocal[]
 	}
 );
 
@@ -77,8 +71,10 @@ export type SyllableSyncedLyrics = (
 	TimeMetadata & {
 		Type: 'Syllable',
 		SongWriters: string[],
-		Content: (SyllableVocalSet | Interlude)[]
+		Content: SyllableVocalSet[]
 	}
 );
 
-export type Lyrics = (StaticSyncedLyrics | LineSyncedLyrics | SyllableSyncedLyrics);
+export type Lyrics = (StaticSyncedLyrics | LineSyncedLyrics | SyllableSyncedLyrics) & {
+	GeneratedWithAI?: boolean;
+};

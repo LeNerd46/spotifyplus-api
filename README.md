@@ -23,3 +23,21 @@ This is an example project made to be used as a quick start into building OpenAP
 1. Run `wrangler dev` to start a local instance of the API.
 2. Open `http://localhost:8787/` in your browser to see the Swagger interface where you can try the endpoints.
 3. Changes made in the `src/` folder will automatically trigger the server to reload, you only need to refresh the Swagger interface.
+
+## AI lyrics generation
+
+1. Request `GET /api/lyrics/:id` to cache the line-synced source lyrics.
+2. Request `POST /api/lyrics/:id/generate` and upload the audio using the returned `generationId` and signed upload request.
+3. Start generation with `POST /api/lyrics/:id/generate/complete`, passing `{ "generationId": "..." }` as JSON.
+4. Poll `GET /api/lyrics/:id/generate/status?generationId=...` until its `status` is `complete` or `failed`.
+
+While work is underway, the status is `awaiting_upload` or `processing`. A successful response has the following shape:
+
+```json
+{
+  "status": "complete",
+  "lyrics": {}
+}
+```
+
+Generation status records remain available for 24 hours.

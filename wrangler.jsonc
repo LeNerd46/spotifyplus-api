@@ -24,6 +24,18 @@
 			"binding": "LYRICS_CACHE",
 			"id": "13402e1ca3a149288aaddd9a4f254bd3"
 		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "AUDIO_BUCKET",
+			"bucket_name": "spotifyplus-generated-lyric-audio",
+			"remote": true
+		},
+		{
+			"binding": "LYRICS_BUCKET",
+			"bucket_name": "spotifyplus-lyrics",
+			"remote": true
+		}
 	]
 	/**
 	 * Smart Placement

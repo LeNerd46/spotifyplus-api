@@ -1,31 +1,65 @@
 import { Context } from "hono";
 import { BlankInput } from "hono/types";
 import { getAppleMusicToken } from "../appleMusicToken";
-import { SpotifyApi } from "@spotify/web-api-ts-sdk";
+import { SpotifyApi } from "@Spotify/web-api-ts-sdk";
 import { parseLyrics } from "../lyricsParser";
 import { Lyrics } from "../types";
+import { generatedJsonKey, generationSourceKey } from "./../lyricsGeneration";
 
-const sdk = SpotifyApi.withClientCredentials(process.env.SPOTIFY_CLIENT!, process.env.SPOTIFY_SECRET!)
+const sdk = SpotifyApi.withClientCredentials(
+    process.env.SPOTIFY_CLIENT!,
+    process.env.SPOTIFY_SECRET!
+);
 
 export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
     try {
         const spotifyId = c.req.param('id');
+
         if (!spotifyId) return c.json({
             error: 'No ID provided'
         }, 400);
 
-        const cachedLyrics = await c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`);
+        const cachedLyrics = await c.env.LYRICS_CACHE.get(
+            `lyrics:${spotifyId}`
+        );
 
         if (cachedLyrics) {
-            return c.json(JSON.parse(cachedLyrics));
+            return c.json(
+                JSON.parse(cachedLyrics)
+            );
         }
 
-        const track = await sdk.tracks.get(spotifyId);
+        const generatedObject = await c.env.LYRICS_BUCKET.get(generatedJsonKey(spotifyId));
+
+        if (generatedObject) {
+            const generatedLyrics = (
+                await generatedObject.json()
+            ) as Lyrics;
+
+            generatedLyrics.GeneratedWithAI = true;
+
+            await c.env.LYRICS_CACHE.put(
+                `lyrics:${spotifyId}`,
+                JSON.stringify(generatedLyrics)
+            );
+
+            return c.json(
+                generatedLyrics
+            );
+        }
+
+        const track = await sdk.tracks.get(
+            spotifyId
+        );
+
         if (!track.external_ids.isrc) return c.json({
             error: 'Could not get ISRC'
         }, 404);
 
-        const token = await getAppleMusicToken(c.env);
+        const token = await getAppleMusicToken(
+            c.env
+        );
+
         const mediaToken = process.env.APPLE_MUSIC_TOKEN as string;
 
         const appleResponse = await fetch(`https://amp-api.music.apple.com/v1/catalog/us/songs?filter[isrc]=${encodeURIComponent(track.external_ids.isrc)}`, {
@@ -35,7 +69,8 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
                 Origin: 'https://music.apple.com',
                 'Media-User-Token': mediaToken
             }
-        });
+        }
+        );
 
         if (!appleResponse.ok) {
             return c.json({
@@ -43,11 +78,9 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             }, 400);
         }
 
-        const appleJson = await appleResponse.json() as {
-            data?: { id: string; type: string; }[]
-        };
+        const appleJson = await appleResponse.json() as { data?: { id: string; type: string; }[] };
 
-        const ids = appleJson.data?.filter(x => x.type === 'songs').map(x => x.id) ?? [];
+        const ids = (appleJson.data?.filter(x => x.type === 'songs').map(x => x.id) ?? []);
 
         if (ids.length === 0) {
             return c.json({
@@ -65,7 +98,8 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
                     Origin: 'https://music.apple.com',
                     'Media-User-Token': mediaToken
                 }
-            });
+            }
+            );
 
             if (response.status === 401) {
                 await c.env.APPLE_CACHE.delete('apple-developer-token');
@@ -81,35 +115,52 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             }
 
             const json: any = await response.json();
-            const ttml = json.data?.[0]?.attributes?.ttmlLocalizations;
+
+            const ttml = (json.data?.[0]?.attributes?.ttmlLocalizations);
+
             if (!ttml) {
-                console.log(`No ttml found for ${id}`)
+                console.log(`No ttml found for ${id}`);
                 continue;
             }
 
             const lyrics = parseLyrics(ttml);
+
+            lyrics.GeneratedWithAI = false;
 
             if (lyrics.Type === 'Static') {
                 fallbackLyrics ??= lyrics;
                 continue;
             }
 
+            if (lyrics.Type === 'Line') {
+                await c.env.LYRICS_CACHE.put(generationSourceKey(spotifyId), ttml, { expirationTtl: 60 * 60 * 24 * 30 });
+            }
+
             await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(lyrics));
+
             return c.json(lyrics);
         }
 
         if (fallbackLyrics) {
-            return c.json(fallbackLyrics);
+            fallbackLyrics.GeneratedWithAI = false;
+
+            return c.json(
+                fallbackLyrics
+            );
         }
 
         return c.json({
             error: 'Could not find lyrics for any matching Apple Music song'
         }, 404);
+
     } catch (error) {
-        console.error('Failed to get Apple Music token:', error);
+        console.error(
+            'Failed to get lyrics:',
+            error
+        );
 
         return c.json({
-            error: 'Failed to get Apple Music token'
+            error: 'Failed to get lyrics'
         }, 500);
     }
 };
