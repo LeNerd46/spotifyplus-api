@@ -1,6 +1,5 @@
 import { Context } from "hono";
 import { BlankInput } from "hono/types";
-import { getAppleMusicToken } from "../appleMusicToken";
 import { SpotifyApi } from "@spotify/web-api-ts-sdk";
 import { parseLyrics } from "../lyricsParser";
 import { Lyrics } from "../types";
@@ -14,7 +13,8 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             error: 'No ID provided'
         }, 400);
 
-        const cachedLyrics = await c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`);
+        const cachedLyrics = await c.env.LYRICS_CACHE.get(`lyrics-community:${spotifyId}`)
+            ?? await c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`);
 
         if (cachedLyrics) {
             return c.json(JSON.parse(cachedLyrics));
@@ -25,6 +25,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             error: 'Could not get ISRC'
         }, 404);
 
+        const { getAppleMusicToken } = await import('../appleMusicToken');
         const token = await getAppleMusicToken(c.env);
         const mediaToken = process.env.APPLE_MUSIC_TOKEN as string;
 

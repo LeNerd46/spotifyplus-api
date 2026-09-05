@@ -3,6 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
@@ -18,6 +20,8 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.5",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
     "wrangler": "^4.127.1"
   }
 }

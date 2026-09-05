@@ -75,6 +75,7 @@ export type SyllableVocalSet = {
 
 export type SyllableSyncedLyrics = (
 	TimeMetadata & {
+		Community?: boolean,
 		Type: 'Syllable',
 		SongWriters: string[],
 		Content: (SyllableVocalSet | Interlude)[]
