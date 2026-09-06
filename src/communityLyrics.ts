@@ -63,7 +63,7 @@ export function validateCommunityLyrics(input: unknown, source: LineSyncedLyrics
         let cursor = 0;
         return given.every(s => { const at = expected.indexOf(s, cursor); cursor = at + 1; return at >= 0; });
     };
-    let previousLeadEnd = -1, sourceIndex = 0;
+    let sourceIndex = 0;
     groups.forEach(g => {
         const leadText = reconstruct(g.Lead);
         const backingText = (g.Background ?? []).map(reconstruct);
@@ -80,10 +80,6 @@ export function validateCommunityLyrics(input: unknown, source: LineSyncedLyrics
         const parts = separateVocals(original!.Text);
         if (g.OppositeAligned !== original!.OppositeAligned) fail('Line alignment must match the source');
         checkVocal(g.Lead, parts.lead, true);
-        if (g.Lead.Syllables.length) {
-            if (g.Lead.StartTime < previousLeadEnd) fail('Lead lines must be in playback order');
-            previousLeadEnd = g.Lead.EndTime;
-        }
         let backgroundIndex = 0;
         g.Background?.forEach(v => {
             const at = parts.background.indexOf(reconstruct(v), backgroundIndex);

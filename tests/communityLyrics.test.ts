@@ -50,6 +50,20 @@ for (const [name, mutate] of Object.entries({
 })) test(`rejects ${name}`, () => { const data = valid(); mutate(data); assert.throws(() => validateCommunityLyrics(data, source)); });
 
 const id = '1234567890123456789012';
+test('accepts overlapping lead lines, including a line contained within another', () => {
+    const original: LineSyncedLyrics = { Type: 'Line', StartTime: 5, EndTime: 10, Content: [
+        { Type: 'Vocal', Text: 'first', StartTime: 5, EndTime: 10, OppositeAligned: false },
+        { Type: 'Vocal', Text: 'next', StartTime: 7, EndTime: 8, OppositeAligned: false },
+    ] };
+    const first = vocal(['first'], 5); first.EndTime = 10; first.Syllables[0].EndTime = 10;
+    const next = vocal(['next'], 7);
+    const data = { Type: 'Syllable', StartTime: 5, EndTime: 10, Content: [
+        { Type: 'Vocal', OppositeAligned: false, Lead: first },
+        { Type: 'Vocal', OppositeAligned: false, Lead: next },
+    ] };
+    assert.doesNotThrow(() => validateCommunityLyrics(data, original));
+});
+
 test('omits all or some backing phrases and allows omitted backing-only lines', () => {
     const data: any = valid(); delete data.Content[0].Background; data.StartTime = 5; data.EndTime = 7.5;
     assert.doesNotThrow(() => validateCommunityLyrics(data, source));

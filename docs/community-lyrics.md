@@ -8,7 +8,7 @@ The track's original line lyrics must already be cached by `GET /api/lyrics/:id`
 Submissions must preserve every lead line, its words, word boundaries and alignment.
 Words can be divided into syllables using `IsPartOfWord: true` on every fragment
 except the final fragment of a word. Each fragment needs finite, positive-duration
-timings; fragments within a vocal and consecutive lead lines must not overlap.
+timings; fragments within a vocal must not overlap. Separate lead lines may overlap.
 Line/song bounds must agree with the contained timings. Timings are bounded by the
 cached source ending plus a 30-second correction allowance, capped at 24 hours.
 
