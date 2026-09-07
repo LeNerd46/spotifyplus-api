@@ -3,6 +3,7 @@ import { BlankInput } from "hono/types";
 import { SpotifyApi } from "@spotify/web-api-ts-sdk";
 import { parseLyrics } from "../lyricsParser";
 import { Lyrics } from "../types";
+import { LrcLyrics, parseLrcLyrics } from "../lrcLyricsParser";
 
 const sdk = SpotifyApi.withClientCredentials(process.env.SPOTIFY_CLIENT!, process.env.SPOTIFY_SECRET!)
 
@@ -13,8 +14,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             error: 'No ID provided'
         }, 400);
 
-        const cachedLyrics = await c.env.LYRICS_CACHE.get(`lyrics-community:${spotifyId}`)
-            ?? await c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`);
+        const cachedLyrics = await c.env.LYRICS_CACHE.get(`lyrics-community:${spotifyId}`) ?? await c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`);
 
         if (cachedLyrics) {
             return c.json(JSON.parse(cachedLyrics));
@@ -51,6 +51,19 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
         const ids = appleJson.data?.filter(x => x.type === 'songs').map(x => x.id) ?? [];
 
         if (ids.length === 0) {
+            const lrcResponse = await fetch(`https://lrclib.net/api/get?track_name=${encodeURIComponent(track.name)}&artist_name=${encodeURIComponent(track.artists[0]?.name ?? '')}&album_name=${encodeURIComponent(track.album.name)}&duration=${encodeURIComponent(track.duration_ms / 1000)}`);
+
+            if (lrcResponse.ok) {
+                const json = await lrcResponse.json() as LrcLyrics;
+                const lyrics = parseLrcLyrics(json);
+
+                if (lyrics) {
+                    const result = lyrics;
+                    await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(result));
+                    return c.json(result);
+                }
+            }
+
             return c.json({
                 error: 'No matching Apple Music songs found'
             }, 404);
@@ -97,6 +110,22 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
 
             await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(lyrics));
             return c.json(lyrics);
+        }
+
+        // Attempt to get lyrics from LRCLib next if no Apple Music lyrics were found
+        // Not including static lyrics. We'd rather have LRCLib than static lyrics
+
+        const lrcResponse = await fetch(`https://lrclib.net/api/get?track_name=${encodeURIComponent(track.name)}&artist_name=${encodeURIComponent(track.artists[0]?.name ?? '')}&album_name=${encodeURIComponent(track.album.name)}&duration=${encodeURIComponent(track.duration_ms / 1000)}`);
+
+        if (lrcResponse.ok) {
+            const json = await lrcResponse.json() as LrcLyrics;
+            const lyrics = parseLrcLyrics(json);
+
+            if (lyrics) {
+                const result = lyrics.Type === 'Static' ? fallbackLyrics ?? lyrics : lyrics;
+                await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(result));
+                return c.json(result);
+            }
         }
 
         if (fallbackLyrics) {

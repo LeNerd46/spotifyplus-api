@@ -22,7 +22,8 @@
 		},
 		{
 			"binding": "LYRICS_CACHE",
-			"id": "13402e1ca3a149288aaddd9a4f254bd3"
+			"id": "13402e1ca3a149288aaddd9a4f254bd3",
+			"remote": true
 		}
 	],
 	"ratelimits": [

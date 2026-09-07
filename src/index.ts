@@ -6,6 +6,7 @@ import { TaskFetch } from "./endpoints/taskFetch";
 import { TaskList } from "./endpoints/taskList";
 import { GetLyrics } from "./endpoints/getLyrics";
 import { SubmitLyrics } from "./endpoints/submitLyrics";
+import { ReportLyrics } from "./endpoints/reportLyrics";
 import { bodyLimit } from 'hono/body-limit';
 
 // Start a Hono app
@@ -46,7 +47,7 @@ app.use('/api/*', async (c, next) => {
 	}
 
 	await next();
-})
+});
 
 // Setup OpenAPI registry
 const openapi = fromHono(app, {
@@ -61,6 +62,7 @@ openapi.delete("/api/tasks/:taskSlug", TaskDelete);
 
 openapi.get('/api/lyrics/:id', GetLyrics);
 app.post('/api/lyrics/:id', bodyLimit({ maxSize: 512 * 1024, onError: c => c.json({ error: 'Lyrics payload too large' }, 413) }), SubmitLyrics);
+app.post('/api/lyrics/:id/reports', bodyLimit({ maxSize: 8 * 1024, onError: c => c.json({ error: 'Report payload too large' }, 413) }), ReportLyrics);
 
 // You may also register routes for non OpenAPI directly on Hono
 // app.get('/test', (c) => c.text('Hono!'))
