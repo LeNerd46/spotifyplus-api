@@ -113,7 +113,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
         }
 
         // Attempt to get lyrics from LRCLib next if no Apple Music lyrics were found
-        // Not including static lyrics. We'd rather have LRCLib than static lyrics
+        // Not including static lyrics. I think we'd rather have LRCLib than static lyrics
 
         const lrcResponse = await fetch(`https://lrclib.net/api/get?track_name=${encodeURIComponent(track.name)}&artist_name=${encodeURIComponent(track.artists[0]?.name ?? '')}&album_name=${encodeURIComponent(track.album.name)}&duration=${encodeURIComponent(track.duration_ms / 1000)}`);
 
@@ -128,12 +128,50 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             }
         }
 
+        // Next we'll check NetEase!! 
+        // Mostly because idk what this is, and we have to make 2 requests for this one whereas lrclib only needs one
+
+        const netEaseSearchResponse = await fetch(`https://music.163.com/api/search/pc?limit=1&type=1&offset=0&s=${encodeURIComponent(`${track.name} ${track.artists[0]?.name ?? ''}`)}`);
+        const netEaseThing = await netEaseSearchResponse.json() as { result?: { songs?: { id: number }[] } };
+
+        if (!netEaseSearchResponse.ok || !netEaseThing.result?.songs?.[0]?.id) {
+            return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
+                error: 'Could not find lyrics'
+            }, 404);
+        }
+
+        const netEaseSearch = await fetch(`https://music.163.com/api/song/lyric?lv=1&id=${netEaseThing.result?.songs?.[0]?.id}`);
+        const lyricsResponse = await netEaseSearch.json() as { lrc?: { lyric?: string } };
+
+        if (!netEaseSearchResponse.ok || !lyricsResponse.lrc?.lyric) {
+            return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
+                error: 'Could not find lyrics'
+            }, 404);
+        }
+
+        // NetEase shoves the artist at the beginning of their lyrics for some reason. We don't want that! The artists are not apart of the lyrics!
+        const netEaseLyrics = lyricsResponse.lrc.lyric.split('\n').filter(line => {
+            const match = line.match(/^\[\d{2}:\d{2}(?:\.\d+)?\](.*)$/);
+            if (!match) return true;
+
+            const text = match[1]?.trim();
+
+            return !/^(作词|作曲)\s*[:：]/.test(text!);
+        }).join('\n');
+
+        const parsedLyrics = parseLrcLyrics({ duration: track.duration_ms / 1000, syncedLyrics: netEaseLyrics });
+        if (parsedLyrics) {
+            await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(parsedLyrics));
+            return c.json(parsedLyrics);
+        }
+
+
         if (fallbackLyrics) {
             return c.json(fallbackLyrics);
         }
 
         return c.json({
-            error: 'Could not find lyrics for any matching Apple Music song'
+            error: 'Could not find lyrics'
         }, 404);
     } catch (error) {
         console.error('Failed to get Apple Music token:', error);
