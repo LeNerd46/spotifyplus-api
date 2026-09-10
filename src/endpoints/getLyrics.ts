@@ -134,35 +134,27 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
         const netEaseSearchResponse = await fetch(`https://music.163.com/api/search/pc?limit=1&type=1&offset=0&s=${encodeURIComponent(`${track.name} ${track.artists[0]?.name ?? ''}`)}`);
         const netEaseThing = await netEaseSearchResponse.json() as { result?: { songs?: { id: number }[] } };
 
-        if (!netEaseSearchResponse.ok || !netEaseThing.result?.songs?.[0]?.id) {
-            return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
-                error: 'Could not find lyrics'
-            }, 404);
-        }
+        if (netEaseSearchResponse.ok && netEaseThing.result?.songs?.[0]?.id) {
+            const netEaseSearch = await fetch(`https://music.163.com/api/song/lyric?lv=1&id=${netEaseThing.result?.songs?.[0]?.id}`);
+            const lyricsResponse = await netEaseSearch.json() as { lrc?: { lyric?: string } };
 
-        const netEaseSearch = await fetch(`https://music.163.com/api/song/lyric?lv=1&id=${netEaseThing.result?.songs?.[0]?.id}`);
-        const lyricsResponse = await netEaseSearch.json() as { lrc?: { lyric?: string } };
+            if (netEaseSearch.ok && lyricsResponse.lrc?.lyric) {
+                // NetEase shoves the artist at the beginning of their lyrics for some reason. We don't want that! The artists are not apart of the lyrics!
+                const netEaseLyrics = lyricsResponse.lrc.lyric.split('\n').filter(line => {
+                    const match = line.match(/^\[\d{2}:\d{2}(?:\.\d+)?\](.*)$/);
+                    if (!match) return true;
 
-        if (!netEaseSearchResponse.ok || !lyricsResponse.lrc?.lyric) {
-            return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
-                error: 'Could not find lyrics'
-            }, 404);
-        }
+                    const text = match[1]?.trim();
 
-        // NetEase shoves the artist at the beginning of their lyrics for some reason. We don't want that! The artists are not apart of the lyrics!
-        const netEaseLyrics = lyricsResponse.lrc.lyric.split('\n').filter(line => {
-            const match = line.match(/^\[\d{2}:\d{2}(?:\.\d+)?\](.*)$/);
-            if (!match) return true;
+                    return !/^(作词|作曲)\s*[:：]/.test(text!);
+                }).join('\n');
 
-            const text = match[1]?.trim();
-
-            return !/^(作词|作曲)\s*[:：]/.test(text!);
-        }).join('\n');
-
-        const parsedLyrics = parseLrcLyrics({ duration: track.duration_ms / 1000, syncedLyrics: netEaseLyrics });
-        if (parsedLyrics) {
-            await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(parsedLyrics));
-            return c.json(parsedLyrics);
+                const parsedLyrics = parseLrcLyrics({ duration: track.duration_ms / 1000, syncedLyrics: netEaseLyrics });
+                if (parsedLyrics) {
+                    await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(parsedLyrics));
+                    return c.json(parsedLyrics);
+                }
+            }
         }
 
         // Fuck Musixmatch dude. They're stuff is so innacurate and I hate it so much
@@ -171,9 +163,13 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
         // or an instrumental song, I guess
         // I am literally only adding this so that people will stop asking me why Spotify has lyrics but my API does not
 
+        console.log('Am I even reaching this point?');
+
         const musixmatchTokenResponse = await fetch(`https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0`);
         const musixmatchTokenJson = await musixmatchTokenResponse.json() as { message?: { body?: { user_token?: string } } };
         if (!musixmatchTokenResponse.ok || !musixmatchTokenJson.message?.body?.user_token) {
+            console.error(await musixmatchTokenResponse.text());
+
             return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
                 error: 'Could not find lyrics'
             }, 404);
@@ -182,6 +178,8 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
         const musixmatchLyricsResponse = await fetch(`https://apic-appmobile.musixmatch.com/ws/1.1/macro.subtitles.get?track_isrc=${encodeURIComponent(track.external_ids.isrc)}&usertoken=${encodeURIComponent(musixmatchTokenJson.message.body.user_token)}&app_id=mac-ios-v2.0`);
         const musixmatchLyricsJson = await musixmatchLyricsResponse.json() as { message?: { body?: { macro_calls?: { 'track.subtitles.get'?: { message?: { body?: { subtitle_list?: Array<{ subtitle?: { subtitle_body?: string } }> } } } } } } };
         if (!musixmatchLyricsResponse.ok || !musixmatchLyricsJson.message?.body?.macro_calls?.['track.subtitles.get']?.message?.body?.subtitle_list?.[0]?.subtitle?.subtitle_body) {
+            console.error(await musixmatchLyricsResponse.text());
+
             return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
                 error: 'Could not find lyrics'
             }, 404);

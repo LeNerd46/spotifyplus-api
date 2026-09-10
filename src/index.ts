@@ -8,41 +8,41 @@ import { homePage } from "./pages/home";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use('/api/*', async (c, next) => {
-	if (c.req.method === 'OPTIONS') {
-		return next();
-	}
+// app.use('/api/*', async (c, next) => {
+// 	if (c.req.method === 'OPTIONS') {
+// 		return next();
+// 	}
 
-	const ip = c.req.header('CF-Connecting-IP');
+// 	const ip = c.req.header('CF-Connecting-IP');
 
-	if (!ip) {
-		return c.json({ error: 'Unable to get IP address' }, 400);
-	}
+// 	if (!ip) {
+// 		return c.json({ error: 'Unable to get IP address' }, 400);
+// 	}
 
-	const overall = await c.env.API_RATE_LIMITER.limit({ key: `ip:${ip}` });
+// 	const overall = await c.env.API_RATE_LIMITER.limit({ key: `ip:${ip}` });
 
-	if (!overall.success) {
-		c.header('Retry-After', '60');
-		c.header('Cache-Control', 'no-store');
+// 	if (!overall.success) {
+// 		c.header('Retry-After', '60');
+// 		c.header('Cache-Control', 'no-store');
 
-		return c.json({ error: 'Too many requests' }, 429);
-	}
+// 		return c.json({ error: 'Too many requests' }, 429);
+// 	}
 
-	const isSubmission = c.req.method === 'POST' && /^\/api\/lyrics\/[^/]+\/?$/.test(c.req.path);
+// 	const isSubmission = c.req.method === 'POST' && /^\/api\/lyrics\/[^/]+\/?$/.test(c.req.path);
 
-	if (isSubmission) {
-		const submission = await c.env.SUBMIT_RATE_LIMITER.limit({ key: `ip:${ip}` });
+// 	if (isSubmission) {
+// 		const submission = await c.env.SUBMIT_RATE_LIMITER.limit({ key: `ip:${ip}` });
 
-		if (!submission.success) {
-			c.header('Retry-After', '60');
-			c.header('Cache-Control', 'no-store');
+// 		if (!submission.success) {
+// 			c.header('Retry-After', '60');
+// 			c.header('Cache-Control', 'no-store');
 
-			return c.json({ error: 'Too many requests' }, 429);
-		}
-	}
+// 			return c.json({ error: 'Too many requests' }, 429);
+// 		}
+// 	}
 
-	await next();
-});
+// 	await next();
+// });
 
 const openapi = fromHono(app, {
 	docs_url: "/sdfsevsevsef",
