@@ -10,7 +10,7 @@ import { LyricsProvider, LyricsProviderContext, LyricsProviderResult } from "./t
 
 const MusixmatchProvider: LyricsProvider = {
     name: 'Musixmatch',
-    priority: 3,
+    priority: 2,
 
     async getLyrics(context: LyricsProviderContext): Promise<LyricsProviderResult> {
         const musixmatchTokenResponse = await fetch(`https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0`);

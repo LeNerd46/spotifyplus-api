@@ -30,6 +30,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             error: 'Could not get ISRC'
         }, 404);
 
+        // We sort by priority because I care about some providers more than others
         const providers = [
             AppleMusicProvider,
             LrclibProvider,
@@ -42,6 +43,9 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
         let fallbackLyrics: Lyrics | null = null;
 
         for (const group of providerGroups.values()) {
+            // Some providers have the same priority because I don't really prefer one over the other
+            // So therefore we do them at the same time to speed things up if one of them do not have lyrics
+            // And if you're requesting lyrics for a song that only has lyrics on Musixmatch, you deserve to wait
             const results = await Promise.all(group.map(async provider => {
                 try {
                     const lyrics = await provider.getLyrics({

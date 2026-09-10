@@ -3,7 +3,7 @@ import { LyricsProvider, LyricsProviderContext, LyricsProviderResult } from "./t
 
 const LrclibProvider: LyricsProvider = {
     name: 'Lrclib',
-    priority: 2,
+    priority: 1,
 
     async getLyrics(context: LyricsProviderContext): Promise<LyricsProviderResult> {
         const lrcResponse = await fetch(`https://lrclib.net/api/get?track_name=${encodeURIComponent(context.track.name)}&artist_name=${encodeURIComponent(context.track.artists[0]?.name ?? '')}&album_name=${encodeURIComponent(context.track.album.name)}&duration=${encodeURIComponent(context.track.duration_ms / 1000)}`);

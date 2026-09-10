@@ -3,7 +3,7 @@ import { LyricsProvider, LyricsProviderContext, LyricsProviderResult } from "./t
 
 const NeteaseProvider: LyricsProvider = {
     name: 'Netease',
-    priority: 2,
+    priority: 1,
 
     async getLyrics(context: LyricsProviderContext): Promise<LyricsProviderResult> {
         const netEaseSearchResponse = await fetch(`https://music.163.com/api/search/pc?limit=1&type=1&offset=0&s=${encodeURIComponent(`${context.track.name} ${context.track.artists[0]?.name ?? ''}`)}`);
