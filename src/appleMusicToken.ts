@@ -1,11 +1,6 @@
 import { launch } from '@cloudflare/playwright';
 
-interface Env {
-    BROWSER: Fetcher;
-    APPLE_CACHE: KVNamespace;
-}
-
-export async function getAppleMusicToken(env: Env): Promise<String> {
+export async function getAppleMusicToken(env: any): Promise<String> {
     const cachedToken = await env.APPLE_CACHE.get('apple-developer-token');
 
     if (cachedToken) return cachedToken;
@@ -22,7 +17,7 @@ export async function getAppleMusicToken(env: Env): Promise<String> {
     return token;
 }
 
-async function getAppleMusicTokenFromWebsite(env: Env): Promise<string> {
+async function getAppleMusicTokenFromWebsite(env: any): Promise<string> {
     const browser = await launch(env.BROWSER);
 
     try {
