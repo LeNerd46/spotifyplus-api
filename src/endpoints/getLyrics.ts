@@ -46,6 +46,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             // Some providers have the same priority because I don't really prefer one over the other
             // So therefore we do them at the same time to speed things up if one of them do not have lyrics
             // And if you're requesting lyrics for a song that only has lyrics on Musixmatch, you deserve to wait
+
             const results = await Promise.all(group.map(async provider => {
                 try {
                     const lyrics = await provider.getLyrics({

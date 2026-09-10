@@ -4,6 +4,9 @@ This is the official API used to fetch lyrics for [Spotify Plus](https://www.git
 
 Currently supported lyric sources:
 - Apple Music
+- Lrclib
+- Netease
+- Musixmatch
 - Community submitted lyrics
 
 ## Using the API
@@ -21,6 +24,36 @@ Retrives lyrics for the given Spotify track
 | Parameter | Type          | Description                      |
 | ------ | ----------------- | -------------------------------- |
 | `id`  | `string` | The Spotify track ID |
+
+### Submit Lyrics
+
+`POST /api/lyrics/:id`
+
+Submits lyrics to the API. Supports the beautiful lyrics format (JSON), TTML, and Enriched LRC. Please do not submit normal LRC.
+
+**Parameters**
+
+| Parameter | Type          | Description                      |
+| ------ | ----------------- | -------------------------------- |
+| `id`  | `string` | The Spotify track ID |
+| `format` | `json \| ttml \| lrc` | The format the lyrics are in |
+
+The body of the request should be your lyrics
+
+### Report Lyrics
+
+`POST /api/lyrics/:id/reports`
+
+| Parameter | Type          | Description                      |
+| ------ | ----------------- | -------------------------------- |
+| `id`  | `string` | The Spotify track ID |
+
+Body contents:
+
+| Key | Value | Desription |
+| --- | ----- | ---------- |
+| `reason` | `timings \| lyrics \| missing \| other ` | The reason for the report |
+| `details` | `string?` | Any additional details about the report |
 
 # How It Works
 
