@@ -165,6 +165,33 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             return c.json(parsedLyrics);
         }
 
+        // Fuck Musixmatch dude. They're stuff is so innacurate and I hate it so much
+        // This is the last resort. If literally no other lyrics provider has lyrics, then and only then will I check Musixmatch
+        // I hate them so much that I am not even going to cache the token. You need a hella niche song to even reach this point (I also just don't want to go through the work to cache it)
+        // or an instrumental song, I guess
+        // I am literally only adding this so that people will stop asking me why Spotify has lyrics but my API does not
+
+        const musixmatchTokenResponse = await fetch(`https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0`);
+        const musixmatchTokenJson = await musixmatchTokenResponse.json() as { message?: { body?: { user_token?: string } } };
+        if (!musixmatchTokenResponse.ok || !musixmatchTokenJson.message?.body?.user_token) {
+            return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
+                error: 'Could not find lyrics'
+            }, 404);
+        }
+
+        const musixmatchLyricsResponse = await fetch(`https://apic-appmobile.musixmatch.com/ws/1.1/macro.subtitles.get?track_isrc=${encodeURIComponent(track.external_ids.isrc)}&user_token=${encodeURIComponent(musixmatchTokenJson.message.body.user_token)}&app_id=mac-ios-v2.0`);
+        const musixmatchLyricsJson = await musixmatchLyricsResponse.json() as { message?: { body?: { macro_calls?: { 'track.subtitles.get'?: { message?: { body?: { subtitle_list?: Array<{ subtitle?: { subtitle_body?: string } }> } } } } } } };
+        if (!musixmatchLyricsResponse.ok || !musixmatchLyricsJson.message?.body?.macro_calls?.['track.subtitles.get']?.message?.body?.subtitle_list?.[0]?.subtitle?.subtitle_body) {
+            return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
+                error: 'Could not find lyrics'
+            }, 404);
+        }
+
+        const musixmatchLyrics = parseLrcLyrics({ duration: track.duration_ms / 1000, syncedLyrics: musixmatchLyricsJson.message.body.macro_calls['track.subtitles.get'].message.body.subtitle_list[0].subtitle.subtitle_body });
+        if (musixmatchLyrics) {
+            await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(musixmatchLyrics));
+            return c.json(musixmatchLyrics);
+        }
 
         if (fallbackLyrics) {
             return c.json(fallbackLyrics);
