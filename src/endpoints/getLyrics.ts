@@ -179,7 +179,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             }, 404);
         }
 
-        const musixmatchLyricsResponse = await fetch(`https://apic-appmobile.musixmatch.com/ws/1.1/macro.subtitles.get?track_isrc=${encodeURIComponent(track.external_ids.isrc)}&user_token=${encodeURIComponent(musixmatchTokenJson.message.body.user_token)}&app_id=mac-ios-v2.0`);
+        const musixmatchLyricsResponse = await fetch(`https://apic-appmobile.musixmatch.com/ws/1.1/macro.subtitles.get?track_isrc=${encodeURIComponent(track.external_ids.isrc)}&usertoken=${encodeURIComponent(musixmatchTokenJson.message.body.user_token)}&app_id=mac-ios-v2.0`);
         const musixmatchLyricsJson = await musixmatchLyricsResponse.json() as { message?: { body?: { macro_calls?: { 'track.subtitles.get'?: { message?: { body?: { subtitle_list?: Array<{ subtitle?: { subtitle_body?: string } }> } } } } } } };
         if (!musixmatchLyricsResponse.ok || !musixmatchLyricsJson.message?.body?.macro_calls?.['track.subtitles.get']?.message?.body?.subtitle_list?.[0]?.subtitle?.subtitle_body) {
             return fallbackLyrics ? c.json(fallbackLyrics) : c.json({
