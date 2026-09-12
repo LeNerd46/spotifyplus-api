@@ -19,16 +19,22 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             error: 'No ID provided'
         }, 400);
 
-        const cachedLyrics = await c.env.LYRICS_CACHE.get(`lyrics-community:${spotifyId}`) ?? await c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`);
+        const [communityLyrics, cachedLyrics] = await Promise.all([
+            c.env.LYRICS_CACHE.get(`lyrics-community:${spotifyId}`),
+            c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`)
+        ]);
 
-        if (cachedLyrics) {
-            return c.json(JSON.parse(cachedLyrics));
+        const lyrics = communityLyrics ?? cachedLyrics;
+
+        if (lyrics) {
+            return c.json(JSON.parse(lyrics));
         }
 
         const track = await sdk.tracks.get(spotifyId);
         if (!track.external_ids.isrc) return c.json({
             error: 'Could not get ISRC'
         }, 404);
+
 
         // We sort by priority because I care about some providers more than others
         const providers = [
@@ -49,7 +55,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
 
             const results = await Promise.all(group.map(async provider => {
                 try {
-                    const lyrics = await provider.getLyrics({
+                    const result = await provider.getLyrics({
                         env: c.env,
                         spotifyId,
                         track
@@ -57,26 +63,26 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
 
                     return {
                         provider,
-                        lyrics
-                    }
+                        lyrics: result
+                    };
                 } catch (error) {
                     return {
                         provider,
                         lyrics: null
-                    }
+                    };
                 }
             }));
 
             for (const result of results) {
-                if (!result.lyrics) continue;
+                if (!result.lyrics || !result.lyrics.lyrics) continue;
 
                 if (result.lyrics.lyrics?.Type === 'Static') {
                     fallbackLyrics ??= result.lyrics.lyrics;
                     continue;
                 }
 
-                await c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(result.lyrics.lyrics));
-                return c.json(result.lyrics);
+                c.executionCtx.waitUntil(c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(result.lyrics.lyrics)));
+                return c.json(result.lyrics.lyrics);
             }
         }
 
@@ -88,10 +94,10 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             error: 'Could not find lyrics'
         }, 404);
     } catch (error) {
-        console.error('Failed to get Apple Music token:', error);
+        console.error('Failed to get lyrics:', error);
 
         return c.json({
-            error: 'Failed to get Apple Music token'
+            error: 'Failed to get lyrics'
         }, 500);
     }
 };
