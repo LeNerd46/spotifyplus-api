@@ -24,6 +24,10 @@
 			"binding": "LYRICS_CACHE",
 			"id": "13402e1ca3a149288aaddd9a4f254bd3",
 			"remote": true
+		},
+		{
+			"binding": "SPOTIFY_CACHE",
+			"id": "08bd5efabec0456f96f03ddde1c677fe"
 		}
 	],
 	"ratelimits": [

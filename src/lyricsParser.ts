@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { removeBackgroundParentheses } from './normalizeLyrics';
 import { LineSyncedLyrics, LineVocal, Lyrics, StaticSyncedLyrics, SyllableMetadata, SyllableSyncedLyrics, SyllableVocal, SyllableVocalSet, TextMetadata } from "./types";
 
 const parser = new XMLParser({
@@ -41,7 +42,9 @@ export const parseLyrics = (ttml: string): Lyrics => {
 
     switch (timing.toLowerCase()) {
         case 'word':
-            return parseSyllableLyrics(body, metadata);
+            const lyrics = parseSyllableLyrics(body, metadata);
+            removeBackgroundParentheses(lyrics);
+            return lyrics;
 
         case 'line':
             return parseLineLyrics(body, metadata);

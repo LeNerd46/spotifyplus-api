@@ -1,11 +1,10 @@
-import { Track } from "@spotify/web-api-ts-sdk";
-import { Env } from "hono"
 import { Lyrics } from "../types";
+import { SpotifyTrack } from "../spotify/metadata";
 
 export type LyricsProviderContext = {
     env: Env;
     spotifyId: string;
-    track: Track;
+    track: SpotifyTrack;
 }
 
 export type LyricsProviderResult = {

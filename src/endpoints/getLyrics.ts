@@ -1,40 +1,41 @@
 import { Context } from "hono";
 import { BlankInput } from "hono/types";
-import { SpotifyApi } from "@spotify/web-api-ts-sdk";
-import { parseLyrics } from "../lyricsParser";
 import { Lyrics } from "../types";
-import { LrcLyrics, parseLrcLyrics } from "../lrcLyricsParser";
-import { LyricsProvider } from "../providers/types";
 import AppleMusicProvider from "../providers/apple";
 import LrclibProvider from "../providers/lrclib";
 import NeteaseProvider from "../providers/netease";
 import MusixmatchProvider from "../providers/musixmatch";
-
-const sdk = SpotifyApi.withClientCredentials(process.env.SPOTIFY_CLIENT!, process.env.SPOTIFY_SECRET!)
+import { getSpotifyTrack, SpotifyMetadataError } from "../spotify/metadata";
+import { removeBackgroundParentheses } from '../normalizeLyrics';
 
 export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
     try {
         const spotifyId = c.req.param('id');
-        if (!spotifyId) return c.json({
-            error: 'No ID provided'
-        }, 400);
+        if (!spotifyId || !/^[a-zA-Z0-9]{22}$/.test(spotifyId)) {
+            return c.json({ error: 'Invalid Spotify track ID' }, 400);
+        }
 
         const [communityLyrics, cachedLyrics] = await Promise.all([
             c.env.LYRICS_CACHE.get(`lyrics-community:${spotifyId}`),
             c.env.LYRICS_CACHE.get(`lyrics:${spotifyId}`)
         ]);
 
-        const lyrics = communityLyrics ?? cachedLyrics;
+        const normalizedCache = [communityLyrics, cachedLyrics].map((value, index) => {
+            if (!value) return null;
+            const lyrics = JSON.parse(value) as Lyrics;
+            if (removeBackgroundParentheses(lyrics)) {
+                const key = index === 0 ? `lyrics-community:${spotifyId}` : `lyrics:${spotifyId}`;
+                c.executionCtx.waitUntil(c.env.LYRICS_CACHE.put(key, JSON.stringify(lyrics)));
+            }
+            return lyrics;
+        });
+        const lyrics = normalizedCache[0] ?? normalizedCache[1];
 
         if (lyrics) {
-            return c.json(JSON.parse(lyrics));
+            return c.json(lyrics);
         }
 
-        const track = await sdk.tracks.get(spotifyId);
-        if (!track.external_ids.isrc) return c.json({
-            error: 'Could not get ISRC'
-        }, 404);
-
+        const track = await getSpotifyTrack(c.env, spotifyId);
 
         // We sort by priority because I care about some providers more than others
         const providers = [
@@ -75,6 +76,7 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
 
             for (const result of results) {
                 if (!result.lyrics || !result.lyrics.lyrics) continue;
+                removeBackgroundParentheses(result.lyrics.lyrics);
 
                 if (result.lyrics.lyrics?.Type === 'Static') {
                     fallbackLyrics ??= result.lyrics.lyrics;
@@ -95,6 +97,10 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
         }, 404);
     } catch (error) {
         console.error('Failed to get lyrics:', error);
+
+        if (error instanceof SpotifyMetadataError) {
+            return c.json({ error: error.message }, error.status as 400 | 404 | 502);
+        }
 
         return c.json({
             error: 'Failed to get lyrics'

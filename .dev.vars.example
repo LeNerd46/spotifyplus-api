@@ -1,0 +1,13 @@
+# Keep this device ID stable. Generate one with: node -e "console.log(require('crypto').randomBytes(20).toString('hex'))"
+SPOTIFY_DEVICE_ID=0123456789abcdef0123456789abcdef01234567
+
+# Only needed for the first successful Spotify login. Remove both afterward.
+SPOTIFY_USERNAME=your-spotify-username
+SPOTIFY_PASSWORD=your-spotify-password
+
+# Existing Apple Music configuration:
+APPLE_MUSIC_TOKEN=your-apple-music-media-user-token
+# Spotify SDK credentials, used before falling back to account auth:
+SPOTIFY_CLIENT=your-spotify-client-id
+SPOTIFY_SECRET=your-spotify-client-secret
+
