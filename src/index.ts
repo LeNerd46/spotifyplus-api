@@ -3,8 +3,15 @@ import { Hono } from "hono";
 import { GetLyrics } from "./endpoints/getLyrics";
 import { SubmitLyrics } from "./endpoints/submitLyrics";
 import { ReportLyrics } from "./endpoints/reportLyrics";
+import { GenerateLyrics } from "./endpoints/generateLyrics";
+import { GetLyricsGenerationStatus } from "./endpoints/getLyricsGenerationStatus";
+import { MAX_GENERATION_BODY_BYTES } from "./lyricsGeneration";
 import { bodyLimit } from 'hono/body-limit';
 import { homePage } from "./pages/home";
+import { Download } from './endpoints/download';
+import { GenerationCoordinator } from './durable-objects/generationCoordinator';
+
+export { GenerationCoordinator };
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -51,6 +58,10 @@ const openapi = fromHono(app, {
 openapi.get('/api/lyrics/:id', GetLyrics);
 app.post('/api/lyrics/:id', bodyLimit({ maxSize: 512 * 1024, onError: c => c.json({ error: 'Lyrics payload too large' }, 413) }), SubmitLyrics);
 app.post('/api/lyrics/:id/reports', bodyLimit({ maxSize: 8 * 1024, onError: c => c.json({ error: 'Report payload too large' }, 413) }), ReportLyrics);
+app.post('/api/lyrics/:id/generate', GenerateLyrics);
+app.get('/api/lyrics/:id/generate', GetLyricsGenerationStatus);
+app.get('/api/download/:id', Download);
+app.get('/monochrome', Download);
 app.get('/', c => c.html(homePage));
 
 export default app;

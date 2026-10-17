@@ -30,6 +30,32 @@
 			"id": "08bd5efabec0456f96f03ddde1c677fe"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "AUDIO_BUCKET",
+			"bucket_name": "spotifyplus-generated-lyric-audio",
+			"remote": true
+		},
+		{
+			"binding": "LYRICS_BUCKET",
+			"bucket_name": "spotifyplus-lyrics",
+			"remote": true
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+                "name": "GENERATION_COORDINATOR",
+                "class_name": "GenerationCoordinator"
+            }	
+		]
+	},
+	"migrations": [
+		{
+            "tag": "generation-coordinator-v1",
+            "new_sqlite_classes": ["GenerationCoordinator"]
+        }
+	],
 	"ratelimits": [
 		{
 			"name": "API_RATE_LIMITER",

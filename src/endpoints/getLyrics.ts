@@ -35,61 +35,10 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             return c.json(lyrics);
         }
 
-        const track = await getSpotifyTrack(c.env, spotifyId);
+        const providerLyrics = await findProviderLyrics(c.env, spotifyId, promise => c.executionCtx.waitUntil(promise));
 
-        // We sort by priority because I care about some providers more than others
-        const providers = [
-            AppleMusicProvider,
-            LrclibProvider,
-            NeteaseProvider,
-            MusixmatchProvider
-        ].sort((a, b) => a.priority - b.priority);
-
-        const providerGroups = Map.groupBy(providers, provider => provider.priority);
-
-        let fallbackLyrics: Lyrics | null = null;
-
-        for (const group of providerGroups.values()) {
-            // Some providers have the same priority because I don't really prefer one over the other
-            // So therefore we do them at the same time to speed things up if one of them do not have lyrics
-            // And if you're requesting lyrics for a song that only has lyrics on Musixmatch, you deserve to wait
-
-            const results = await Promise.all(group.map(async provider => {
-                try {
-                    const result = await provider.getLyrics({
-                        env: c.env,
-                        spotifyId,
-                        track
-                    });
-
-                    return {
-                        provider,
-                        lyrics: result
-                    };
-                } catch (error) {
-                    return {
-                        provider,
-                        lyrics: null
-                    };
-                }
-            }));
-
-            for (const result of results) {
-                if (!result.lyrics || !result.lyrics.lyrics) continue;
-                removeBackgroundParentheses(result.lyrics.lyrics);
-
-                if (result.lyrics.lyrics?.Type === 'Static') {
-                    fallbackLyrics ??= result.lyrics.lyrics;
-                    continue;
-                }
-
-                c.executionCtx.waitUntil(c.env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(result.lyrics.lyrics)));
-                return c.json(result.lyrics.lyrics);
-            }
-        }
-
-        if (fallbackLyrics) {
-            return c.json(fallbackLyrics);
+        if (providerLyrics) {
+            return c.json(providerLyrics);
         }
 
         return c.json({
@@ -106,4 +55,62 @@ export const GetLyrics = async (c: Context<any, any, BlankInput>) => {
             error: 'Failed to get lyrics'
         }, 500);
     }
+};
+
+// Checks every provider in priority order, preferring synced lyrics over static ones
+export const findProviderLyrics = async (env: Env, spotifyId: string, waitUntil: (promise: Promise<unknown>) => void): Promise<Lyrics | null> => {
+    const track = await getSpotifyTrack(env, spotifyId);
+
+    // We sort by priority because I care about some providers more than others
+    const providers = [
+        AppleMusicProvider,
+        LrclibProvider,
+        NeteaseProvider,
+        MusixmatchProvider
+    ].sort((a, b) => a.priority - b.priority);
+
+    const providerGroups = Map.groupBy(providers, provider => provider.priority);
+
+    let fallbackLyrics: Lyrics | null = null;
+
+    for (const group of providerGroups.values()) {
+        // Some providers have the same priority because I don't really prefer one over the other
+        // So therefore we do them at the same time to speed things up if one of them do not have lyrics
+        // And if you're requesting lyrics for a song that only has lyrics on Musixmatch, you deserve to wait
+
+        const results = await Promise.all(group.map(async provider => {
+            try {
+                const result = await provider.getLyrics({
+                    env,
+                    spotifyId,
+                    track
+                });
+
+                return {
+                    provider,
+                    lyrics: result
+                };
+            } catch (error) {
+                return {
+                    provider,
+                    lyrics: null
+                };
+            }
+        }));
+
+        for (const result of results) {
+            if (!result.lyrics || !result.lyrics.lyrics) continue;
+            removeBackgroundParentheses(result.lyrics.lyrics);
+
+            if (result.lyrics.lyrics?.Type === 'Static') {
+                fallbackLyrics ??= result.lyrics.lyrics;
+                continue;
+            }
+
+            waitUntil(env.LYRICS_CACHE.put(`lyrics:${spotifyId}`, JSON.stringify(result.lyrics.lyrics)));
+            return result.lyrics.lyrics;
+        }
+    }
+
+    return fallbackLyrics;
 };
